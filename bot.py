@@ -33,6 +33,7 @@ class TxtCommand:
         TxtCommand.update_aliases(self.aliases, self.name)
         TxtCommand.update_commands(self.name, self)
 
+        @wraps(func)
         def wrappee(*args, **kwargs):
             func(*args,**kwargs)
         return wrappee
