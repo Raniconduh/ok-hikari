@@ -3,6 +3,7 @@ import os
 import hikari
 import asyncio
 import requests
+import unicodedata
 import urllib.parse
 from functools import wraps
 from datetime import datetime
@@ -293,6 +294,7 @@ async def summarize(event, dat):
 
     if not dat:
         await event.message.respond("Nothing to summarize", reply=True)
+        return
 
     loop = asyncio.get_running_loop()
     summ = await loop.run_in_executor(None, query_summary, dat)
@@ -316,6 +318,46 @@ async def summarize(event, dat):
         embed.set_image(summ.image)
 
     await event.message.respond(embed=embed, reply=True)
+
+
+@TxtCommand()
+async def poll(event, dat):
+    """Create a poll from a comma separated list"""
+
+    dat = dat.split(',')
+    title = dat[0].strip()
+
+    if not title:
+        await event.message.respond("No poll arguments", reply=True)
+        return
+
+    sanitized = []
+    for i in range(1, len(dat)):
+        d = dat[i].strip()
+        if not d:
+            continue
+        sanitized.append(d)
+
+    if not sanitized:
+        await event.message.respond("Not enough poll arguments")
+        return
+    if len(sanitized) > 20:
+        await event.message.respond("Too many poll arguments")
+        return
+
+    embed = hikari.embeds.Embed(title=title)
+
+    desc = ""
+    for i in range(len(sanitized)):
+        letter = chr(ord('a') + i)
+        desc += f":regional_indicator_{letter}:: {sanitized[i]}\n"
+    embed.description = desc
+
+    msg = await event.message.respond(embed=embed)
+    for i in range(len(sanitized)):
+        letter = chr(ord('A') + i)
+        emoji = unicodedata.lookup(f"REGIONAL INDICATOR SYMBOL LETTER {letter}")
+        await msg.add_reaction(emoji)
 
 
 @bot.listen()
