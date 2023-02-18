@@ -160,6 +160,19 @@ def query_summary(text):
                    image=image, thumb=thumb)
 
 
+def get_command_info(name):
+    if name not in TxtCommand.commands: return None
+
+    com = TxtCommand.commands[name]
+    txt = f"{com.name}"
+    if com.aliases:
+        for alias in com.aliases:
+            txt += f" | {alias}"
+    if com.arguments:
+        txt += f" {com.arguments}"
+
+    return txt
+
 @TxtCommand()
 async def ping(event, dat):
     """Pong!"""
@@ -178,7 +191,8 @@ async def c_help(event, dat):
 
         if dat in TxtCommand.commands:
             com = TxtCommand.commands[dat]
-            await event.message.respond(f"{com.desc} {com.arguments}", reply=True)
+            txt = "!" + get_command_info(dat) + "\n\n" + com.desc
+            await event.message.respond(txt, reply=True)
         else:
             await event.message.respond(f'No command {dat}', reply=True)
     else:
@@ -191,11 +205,7 @@ async def c_help(event, dat):
                 )
         for com in TxtCommand.commands:
             com = TxtCommand.commands[com]
-            txt = f"{com.name}"
-            for alias in TxtCommand.aliases:
-                if TxtCommand.aliases[alias] == com.name:
-                    txt += f" | {alias}"
-            txt += f" {com.arguments}"
+            txt = get_command_info(com.name)
 
             embed.add_field(txt, com.desc)
 
@@ -324,7 +334,7 @@ async def summarize(event, dat):
     await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand(arguments="<title>, <item1>...")
+@TxtCommand(arguments="<title>, <item>...")
 async def poll(event, dat):
     """Create a poll from a comma separated list"""
 
