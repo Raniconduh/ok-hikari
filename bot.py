@@ -377,6 +377,8 @@ async def poll(event, dat):
 @bot.listen()
 async def on_message(event: hikari.MessageCreateEvent) -> None:
     if not event.message or not event.message.content: return
+    me = bot.get_me()
+    if event.message.author.id == me.id: return
 
     msg = event.message.content.partition(' ')
     msg = [msg[0], msg[2]]
@@ -390,7 +392,6 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
     dat = None
 
     # check if command or starts with ping
-    me = bot.get_me()
     if msg[0].startswith('!'):
         cmd = msg[0][1:]
         dat = ' '.join(msg[1:])
