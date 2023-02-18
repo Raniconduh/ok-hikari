@@ -22,9 +22,10 @@ class TxtCommand:
     commands = {}
     aliases = {}
 
-    def __init__(self, name=None, aliases=None):
+    def __init__(self, name=None, aliases=None, arguments=""):
         self.name = name
         self.aliases = aliases
+        self.arguments = arguments
 
     def __call__(self, func):
         self.func = func
@@ -167,7 +168,7 @@ async def ping(event, dat):
     await event.message.respond(f"pong {latency * 1000:.1f}ms", reply=True)
 
 
-@TxtCommand(name="help")
+@TxtCommand(name="help", arguments="[command]")
 async def c_help(event, dat):
     """Show command help or list all commands"""
 
@@ -176,7 +177,8 @@ async def c_help(event, dat):
             dat = TxtCommand.aliases[dat]
 
         if dat in TxtCommand.commands:
-            await event.message.respond(TxtCommand.commands[dat].desc, reply=True)
+            com = TxtCommand.commands[dat]
+            await event.message.respond(f"{com.desc} {com.arguments}", reply=True)
         else:
             await event.message.respond(f'No command {dat}', reply=True)
     else:
@@ -193,12 +195,14 @@ async def c_help(event, dat):
             for alias in TxtCommand.aliases:
                 if TxtCommand.aliases[alias] == com.name:
                     txt += f" | {alias}"
+            txt += f" {com.arguments}"
+
             embed.add_field(txt, com.desc)
 
         await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand(aliases=["t"])
+@TxtCommand(aliases=["t"], arguments="[text]")
 async def translate(event, dat):
     """Translate text, replied message, or latest message"""
 
@@ -232,7 +236,7 @@ async def translate(event, dat):
     await event.message.respond(t, reply=True)
 
 
-@TxtCommand(aliases=["a"])
+@TxtCommand(aliases=["a"], arguments="[user]")
 async def avatar(event, dat):
     """Fetch a user's avatar"""
 
@@ -262,7 +266,7 @@ async def avatar(event, dat):
     await event.message.respond(embed=e, reply=True)
 
 
-@TxtCommand(aliases=["d"])
+@TxtCommand(aliases=["d"], arguments="<word>")
 async def define(event, dat):
     """Define a word or phrase"""
 
@@ -288,7 +292,7 @@ async def define(event, dat):
     await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand(aliases=["s"])
+@TxtCommand(aliases=["s"], arguments="<term>")
 async def summarize(event, dat):
     """Summarize a term or phrase or find related info"""
 
@@ -320,7 +324,7 @@ async def summarize(event, dat):
     await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand()
+@TxtCommand(arguments="<title>, <item1>...")
 async def poll(event, dat):
     """Create a poll from a comma separated list"""
 
