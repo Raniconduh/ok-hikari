@@ -22,9 +22,10 @@ class TxtCommand:
     commands = {}
     aliases = {}
 
-    def __init__(self, name=None, aliases=None, arguments=""):
+    def __init__(self, name=None, aliases=None, flags=[], arguments=""):
         self.name = name
         self.aliases = aliases
+        self.flags = flags
         self.arguments = arguments
 
     def __call__(self, func):
@@ -68,8 +69,8 @@ class Summary:
         self.image = image
 
 
-def query_translator(text):
-    return translator.translate(text, "english").result
+def query_translator(text, lang="english"):
+    return translator.translate(text, lang).result
 
 
 def query_definition(word):
@@ -212,8 +213,8 @@ async def c_help(event, dat):
         await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand(aliases=["t"], arguments="[text]")
-async def translate(event, dat):
+@TxtCommand(aliases=["t"], flags=["to"], arguments="[--to=<lang>] [text]")
+async def translate(event, dat, to="english"):
     """Translate text, replied message, or latest message"""
 
     if not dat:
@@ -242,7 +243,7 @@ async def translate(event, dat):
     dat = dat.strip()
 
     loop = asyncio.get_running_loop()
-    t = await loop.run_in_executor(None, query_translator, dat)
+    t = await loop.run_in_executor(None, query_translator, dat, to)
     await event.message.respond(t, reply=True)
 
 
@@ -404,13 +405,39 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
     else:
         return
 
-    if cmd and cmd in TxtCommand.aliases:
+    if cmd in TxtCommand.aliases:
         cmd = TxtCommand.aliases[cmd]
 
-    if cmd and cmd in TxtCommand.commands:
-        print(f"Command {cmd} from {event.message.author}")
-        async with bot.rest.trigger_typing(event.channel_id):
-            await TxtCommand.commands[cmd].func(event, dat)
+    if cmd in TxtCommand.commands:
+        cmd = TxtCommand.commands[cmd]
+    else:
+        return
+
+    # parse flags
+    new_dat = []
+    flags = {}
+    dat = dat.split(' ')
+    i = 0
+    while i < len(dat) and dat[i].startswith('--'):
+        print(i)
+        v = dat[i].partition('=')
+        flag = v[0][2:]
+        val = v[2]
+
+        if flag in cmd.flags:
+            flags[flag] = val
+        else:
+            new_dat.append(dat[i])
+
+        i += 1
+
+    for d in dat[i:]:
+        new_dat.append(d)
+    dat = ' '.join(new_dat)
+
+    print(f"Command {cmd.name} from {event.message.author}")
+    async with bot.rest.trigger_typing(event.channel_id):
+        await cmd.func(event, dat, **flags)
 
 
 bot.run()
