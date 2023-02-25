@@ -221,7 +221,7 @@ async def translate(event, dat, to="english"):
         dat = ""
         if event.message.type == hikari.MessageType.REPLY:
             repl = event.message.referenced_message
-            dat = repl.content
+            dat = repl.content or ""
             l = []
             for embed in repl.embeds:
                 l.append(embed.title or "")
@@ -233,6 +233,10 @@ async def translate(event, dat, to="english"):
             if l:
                 if dat: dat += '\n'
                 dat += '\n'.join(l)
+
+            if not dat:
+                await event.message.respond("No text", reply=True)
+                return
         else:
             chan = await event.message.fetch_channel()
             async for m in chan.fetch_history(before=event.message):
