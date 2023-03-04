@@ -178,10 +178,14 @@ def get_command_info(name):
 def get_embeds_text(embeds):
     text = []
     for embed in embeds:
+        if embed.title:
+            text.append(embed.title)
         if embed.description:
             text.append(embed.description)
         for field in embed.fields:
-            text.append(f"{field.name} {field.value}")
+            text.append(f'{field.name or ""} {field.value or ""}'.strip())
+        if embed.footer and embed.footer.text:
+            text.append(embed.footer.text)
     return text
 
 
@@ -233,15 +237,7 @@ async def translate(event, dat, to="english"):
         if event.message.type == hikari.MessageType.REPLY:
             repl = event.message.referenced_message
             dat = repl.content or ""
-            l = []
-            for embed in repl.embeds:
-                l.append(embed.title or "")
-                l.append(embed.description or "")
-                for field in embed.fields:
-                    t = f'{field.name or ""} {field.value or ""}'
-                    l.append(t.strip())
-                l.append(embed.footer or "")
-            if l:
+            if l := get_embeds_text(repl.embeds):
                 if dat: dat += '\n'
                 dat += '\n'.join(l)
 
@@ -251,7 +247,10 @@ async def translate(event, dat, to="english"):
         else:
             chan = await event.message.fetch_channel()
             async for m in chan.fetch_history(before=event.message):
-                dat = m.content
+                dat = m.content or ""
+                if l := get_embeds_text(m.embeds):
+                    if dat: dat += '\n'
+                    dat += '\n'.join(l)
                 break
 
     dat = re.sub("<@[!#$%^&*]?([0-9]+)>", "@-", dat)
