@@ -393,6 +393,7 @@ async def poll(event, dat):
         return
 
     embed = hikari.embeds.Embed(title=title)
+    embed.set_footer(f"Poll by {event.author.username}#{event.author.discriminator}")
 
     desc = ""
     for i in range(len(sanitized)):
@@ -466,7 +467,7 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         async with bot.rest.trigger_typing(event.channel_id):
             await cmd.func(event, msg, **flags)
     except Exception as e:
-        embed = hikari.embeds.embed(title="Command failed", color=0xFF0000)
+        embed = hikari.embeds.Embed(title="Command failed", color=0xFF0000)
         await event.message.respond(embed=embed, reply=True)
 
         raise e
