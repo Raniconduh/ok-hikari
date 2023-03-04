@@ -53,6 +53,12 @@ class TxtCommand:
         TxtCommand.commands[name] = com
 
 
+class Flag:
+    def __init__(self, flag, arg=None):
+        self.flag = flag
+        self.arg = arg
+
+
 class Definition:
     def __init__(self, pos, definition, info):
         self.part_of_speech = pos
@@ -69,8 +75,8 @@ class Summary:
         self.image = image
 
 
-def query_translator(text, lang="english"):
-    return translator.translate(text, lang).result
+def query_translator(text, lang="english", origin="auto"):
+    return translator.translate(text, lang, origin).result
 
 
 def query_definition(word, lang="en"):
@@ -170,6 +176,11 @@ def get_command_info(name):
     if com.aliases:
         for alias in com.aliases:
             txt += f" | {alias}"
+    for flag in com.flags:
+        if flag.arg:
+            txt += f" [--{flag.flag}=<{flag.arg}>]"
+        else:
+            txt += f" [--{flag.flag}]"
     if com.arguments:
         txt += f" {com.arguments}"
 
@@ -229,8 +240,8 @@ async def c_help(event, dat):
         await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand(aliases=["t"], flags=["to"], arguments="[--to=<lang>] [text]")
-async def translate(event, dat, to="english"):
+@TxtCommand(aliases=["t"], flags=[Flag("to", "lang"), Flag("origin", "lang")], arguments="[text]")
+async def translate(event, dat, to="english", origin="auto"):
     """Translate text, replied message, or latest message"""
 
     if not dat:
@@ -259,7 +270,7 @@ async def translate(event, dat, to="english"):
 
     loop = asyncio.get_running_loop()
     try:
-        t = await loop.run_in_executor(None, query_translator, dat, to)
+        t = await loop.run_in_executor(None, query_translator, dat, to, origin)
         await event.message.respond(t, reply=True)
     except translatepy.exceptions.UnknownLanguage as e:
         embed = hikari.embeds.Embed(title="Unknown language", color=0xFF0000)
@@ -303,7 +314,7 @@ async def avatar(event, dat):
     await event.message.respond(embed=e, reply=True)
 
 
-@TxtCommand(aliases=["d"], flags=["lang"], arguments="[--lang=<lang>] <word>")
+@TxtCommand(aliases=["d"], flags=[Flag("lang", "lang")], arguments="<word>")
 async def define(event, dat, lang="en"):
     """Define a word or phrase. Language argument must be the language shorthand (e.g. Spanish -> es)"""
 
