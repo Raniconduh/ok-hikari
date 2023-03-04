@@ -174,6 +174,17 @@ def get_command_info(name):
 
     return txt
 
+
+def get_embeds_text(embeds):
+    text = []
+    for embed in embeds:
+        if embed.description:
+            text.append(embed.description)
+        for field in embed.fields:
+            text.append(f"{field.name} {field.value}")
+    return text
+
+
 @TxtCommand()
 async def ping(event, dat):
     """Pong!"""
@@ -385,63 +396,57 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
     me = bot.get_me()
     if event.message.author.id == me.id: return
 
+    # message parsing: return early if the message is clearly not a command
     msg = event.message.content.partition(' ')
-    msg = [msg[0], msg[2]]
-    for embed in event.message.embeds:
-        msg.append(embed.description)
-        for field in embed.fields:
-            msg.append(f'{field.name} {field.value}')
-    msg = [msg[0], '\n'.join(msg[1:])]
-
     cmd = None
-    dat = None
-
-    # check if command or starts with ping
     if msg[0].startswith('!'):
         cmd = msg[0][1:]
-        dat = ' '.join(msg[1:])
+        msg = msg[2]
     elif msg[0] == f'<@{me.id}>':
-        msg = msg[1].partition(' ')
+        msg = msg[2].partition(' ')
+
         cmd = msg[0]
-        dat = msg[2]
+        msg = msg[2]
+
         if not cmd:
-            await TxtCommand.commands["help"].func(event, dat)
+            await TxtCommand.commands["help"].func(event, '')
+            return
     else:
         return
 
     if cmd in TxtCommand.aliases:
         cmd = TxtCommand.aliases[cmd]
-
     if cmd in TxtCommand.commands:
         cmd = TxtCommand.commands[cmd]
     else:
         return
 
+    msg += '\n'.join(get_embeds_text(event.message.embeds))
+
     # parse flags
-    new_dat = []
+    new_msg = []
     flags = {}
-    dat = dat.split(' ')
+    msg = msg.split(' ')
     i = 0
-    while i < len(dat) and dat[i].startswith('--'):
-        print(i)
-        v = dat[i].partition('=')
+    while i < len(msg) and msg[i].startswith('--'):
+        v = msg[i].partition('=')
         flag = v[0][2:]
         val = v[2]
 
         if flag in cmd.flags:
             flags[flag] = val
         else:
-            new_dat.append(dat[i])
+            new_msg.append(msg[i])
 
         i += 1
 
-    for d in dat[i:]:
-        new_dat.append(d)
-    dat = ' '.join(new_dat)
+    for d in msg[i:]:
+        new_msg.append(d)
+    msg = ' '.join(new_msg)
 
     print(f"Command {cmd.name} from {event.message.author}")
     async with bot.rest.trigger_typing(event.channel_id):
-        await cmd.func(event, dat, **flags)
+        await cmd.func(event, msg, **flags)
 
 
 bot.run()
