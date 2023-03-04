@@ -4,6 +4,7 @@ import hikari
 import asyncio
 import requests
 import unicodedata
+import translatepy
 import urllib.parse
 from functools import wraps
 from datetime import datetime
@@ -257,8 +258,19 @@ async def translate(event, dat, to="english"):
     dat = dat.strip()
 
     loop = asyncio.get_running_loop()
-    t = await loop.run_in_executor(None, query_translator, dat, to)
-    await event.message.respond(t, reply=True)
+    try:
+        t = await loop.run_in_executor(None, query_translator, dat, to)
+        await event.message.respond(t, reply=True)
+    except translatepy.exceptions.UnknownLanguage as e:
+        embed = hikari.embeds.Embed(title="Unknown language", color=0xFF0000)
+        embed.description = f'Maybe you meant {e.guessed_language}?'
+        await event.message.respond(embed=embed, reply=True)
+    except translatepy.exceptions.NoResult:
+        embed = hikari.embeds.Embed(title="No translation result", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+    except Exception:
+        embed = hikari.embeds.Embed(title="Translation failed", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
 
 
 @TxtCommand(aliases=["a"], arguments="[user]")
