@@ -462,9 +462,13 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         flag = v[0][2:]
         val = v[2]
 
-        if flag in cmd.flags:
-            flags[flag] = val
-        else:
+        found = False
+        for f in cmd.flags:
+            if flag == f.flag:
+                flags[flag] = val
+                found = True
+                break
+        if not found:
             new_msg.append(msg[i])
 
         i += 1
