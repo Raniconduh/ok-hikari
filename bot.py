@@ -12,7 +12,6 @@ from translatepy import Translator
 from scraper import Scraper as WktScraper
 
 translator = Translator()
-wkt_scraper = WktScraper("en")
 
 bot = hikari.GatewayBot(intents=hikari.Intents.GUILD_MESSAGES
                                 | hikari.Intents.MESSAGE_CONTENT,
@@ -74,8 +73,9 @@ def query_translator(text, lang="english"):
     return translator.translate(text, lang).result
 
 
-def query_definition(word):
+def query_definition(word, lang="en"):
     resp = None
+    wkt_scraper = WktScraper(lang)
     try:
         resp = wkt_scraper.scrape(word)
     except FileNotFoundError:
@@ -303,16 +303,22 @@ async def avatar(event, dat):
     await event.message.respond(embed=e, reply=True)
 
 
-@TxtCommand(aliases=["d"], arguments="<word>")
-async def define(event, dat):
-    """Define a word or phrase"""
+@TxtCommand(aliases=["d"], flags=["lang"], arguments="[--lang=<lang>] <word>")
+async def define(event, dat, lang="en"):
+    """Define a word or phrase. Language argument must be the language shorthand (e.g. Spanish -> es)"""
 
     if not dat:
         await event.message.respond("Nothing to define", reply=True)
         return
 
     loop = asyncio.get_running_loop()
-    defs = await loop.run_in_executor(None, query_definition, dat)
+    try:
+        defs = await loop.run_in_executor(None, query_definition, dat, lang)
+    except KeyError:
+        embed = hikari.embeds.Embed(title="Invalid language", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+
     if not defs or not len(defs["definitions"]):
         await event.message.respond("Could not get definition", reply=True)
         return
@@ -456,8 +462,13 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
     msg = ' '.join(new_msg)
 
     print(f"Command {cmd.name} from {event.message.author}")
-    async with bot.rest.trigger_typing(event.channel_id):
-        await cmd.func(event, msg, **flags)
+    try:
+        async with bot.rest.trigger_typing(event.channel_id):
+            await cmd.func(event, msg, **flags)
+    except Exception as e:
+        embed = hikari.embeds.embed(title="Command failed", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
 
+        raise e
 
 bot.run()
