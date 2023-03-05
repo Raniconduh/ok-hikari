@@ -21,7 +21,8 @@ bot = hikari.GatewayBot(intents=hikari.Intents.GUILD_MESSAGES
 lavalink = lavaplayer.LavalinkClient(
     host=os.getenv("LAVALINK_HOST"),
     port=os.getenv("LAVALINK_PORT"),
-    password=os.getenv("LAVALINK_PASSWORD")
+    password=os.getenv("LAVALINK_PASSWORD"),
+    is_ssl=bool(os.getenv("LAVALINK_IS_SSL"))
 )
 
 class TxtCommand:
