@@ -419,6 +419,38 @@ async def poll(event, dat):
         await msg.add_reaction(emoji)
 
 
+@TxtCommand(aliases=["e"], arguments="<emoji>")
+async def emoji(event, dat):
+    """Show the image of a given emoji"""
+    emoji = None
+
+    if not dat:
+        embed = hikari.embeds.Embed(title="No emoji given", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    guild = await bot.rest.fetch_guild(event.guild_id)
+    if r := re.match(r'<:[^:]+:([0-9]+)>', dat):
+        e_id = r.group(1)
+        emoji = bot.cache.get_emoji(e_id) or await guild.fetch_emoji(e_id)
+    else:
+        emojis = bot.cache.get_emojis_view_for_guild(guild) or await guild.fetch_emojis()
+        for e in emojis:
+            if e.name == dat:
+                emoji = e
+                break
+
+    if emoji is None:
+        embed = hikari.embeds.Embed(title="No emoji found", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    embed = hikari.embeds.Embed(title=f"Image for :{emoji.name}:")
+    embed.set_image(emoji.url)
+
+    await event.message.respond(embed=embed, reply=True)
+
+
 @bot.listen()
 async def on_message(event: hikari.MessageCreateEvent) -> None:
     if not event.message or not event.message.content: return
