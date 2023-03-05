@@ -3,6 +3,7 @@ import os
 import hikari
 import asyncio
 import requests
+import lavaplayer
 import unicodedata
 import translatepy
 import urllib.parse
@@ -14,9 +15,14 @@ from scraper import Scraper as WktScraper
 translator = Translator()
 
 bot = hikari.GatewayBot(intents=hikari.Intents.GUILD_MESSAGES
-                                | hikari.Intents.MESSAGE_CONTENT,
+                                | hikari.Intents.MESSAGE_CONTENT
+                                | hikari.Intents.ALL_UNPRIVILEGED,
                         token=os.getenv("DISCORD_TOKEN"), logs="ERROR")
-
+lavalink = lavaplayer.LavalinkClient(
+    host=os.getenv("LAVALINK_HOST"),
+    port=os.getenv("LAVALINK_PORT"),
+    password=os.getenv("LAVALINK_PASSWORD")
+)
 
 class TxtCommand:
     commands = {}
@@ -199,6 +205,29 @@ def get_embeds_text(embeds):
         if embed.footer and embed.footer.text:
             text.append(embed.footer.text)
     return text
+
+
+def stotime(seconds):
+    s = int(seconds) % 60
+    m = int(seconds // 60) % 60
+    h = int(seconds // 3600)
+
+    if h: return f'{h}:{m:0>2}:{s:0>2}'
+    else: return f'{m}:{s:0>2}'
+
+
+def mstotime(ms):
+    return stotime(ms // 1000)
+
+
+async def check_voice_and_reply(event):
+    voice_state = bot.cache.get_voice_state(event.guild_id, event.author_id)
+    if voice_state is None:
+        embed = hikari.embeds.Embed(title="You must be in a voice channel to use this command",
+                                    color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return False
+    return True
 
 
 @TxtCommand()
@@ -451,6 +480,144 @@ async def emoji(event, dat):
     await event.message.respond(embed=embed, reply=True)
 
 
+@TxtCommand(aliases=["p"], arguments="<query|url>")
+async def play(event, dat):
+    """Play query or url in voice channel"""
+    # first join the voice channel
+    voice_state = bot.cache.get_voice_state(event.guild_id, event.author_id)
+    if not await check_voice_and_reply(event):
+        return
+
+    if not dat:
+        embed = hikari.embeds.Embed("Nothing to play", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    channel_id = voice_state.channel_id
+    await bot.update_voice_state(event.guild_id, channel_id, self_deaf=True)
+    await lavalink.wait_for_connection(event.guild_id)
+
+    result = await lavalink.auto_search_tracks(dat)
+
+    if not result:
+        embed = hikari.embeds.Embed(title="No result found", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+    elif isinstance(result, lavaplayer.TrackLoadFailed):
+        embed = hikari.embeds.Embed(title="Could not load track", color=0xFF0000)
+        embed.description = result.message
+        await event.message.respond(embed=embed, reply=True)
+        return
+    elif isinstance(result, lavaplayer.PlayList):
+        await lavalink.add_to_queue(event.guild_id, result.tracks, event.author_id)
+        embed = hikari.embeds.Embed(title="Added playlist")
+        embed.description = result.name
+        await event.message.respond(embed=embed)
+        return
+
+    await lavalink.play(event.guild_id, result[0], event.author_id)
+    queue = await lavalink.queue(event.guild_id)
+
+    embed = None
+    if len(queue) > 1:
+        embed = hikari.embeds.Embed(title="Added to queue")
+    else:
+        embed = hikari.embeds.Embed(title="Now playing")
+
+    length = mstotime(result[0].length)
+    embed.description = f"{result[0].title}\n\n{length}"
+    await event.message.respond(embed=embed)
+
+
+@TxtCommand()
+async def stop(event, dat):
+    """Stop playing"""
+    if not await check_voice_and_reply(event):
+        return
+
+    await lavalink.stop(event.guild_id)
+    await bot.update_voice_state(event.guild_id, None)
+
+    embed = hikari.embeds.Embed(title="Stopped playing")
+    await event.message.respond(embed=embed)
+
+
+@TxtCommand()
+async def leave(event, dat):
+    """Leave a voice channel"""
+    if not await check_voice_and_reply(event):
+        return
+
+    await bot.update_voice_state(event.guild_id, None)
+
+
+@TxtCommand()
+async def skip(event, dat):
+    """Skip current playing track"""
+    if not await check_voice_and_reply(event):
+        return
+
+    await lavalink.skip(event.guild_id)
+
+
+@TxtCommand(aliases=["que", "q"])
+async def queue(event, dat):
+    """Show queue"""
+    queue = await lavalink.queue(event.guild_id)
+    if not queue or len(queue) == 1:
+        embed = hikari.embeds.Embed(title="Queue empty")
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    embed = hikari.embeds.Embed(title="Queue")
+    for i, track in enumerate(queue[1:]):
+        embed.add_field(f'{i + 1}.', track.title)
+    await event.message.respond(embed=embed, reply=True)
+
+
+@TxtCommand(aliases=["np"])
+async def now(event, dat):
+    """Show currently playing track"""
+    queue = await lavalink.queue(event.guild_id)
+    if not queue:
+        embed = hikari.embeds.Embed(title="Nothing is playing")
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    track = queue[0]
+    position = stotime(track.position)
+    length = mstotime(track.length)
+
+    embed = hikari.embeds.Embed(title="Now playing")
+    embed.description = f"{track.title}\n\n{position}/{length}"
+
+    await event.message.respond(embed=embed, reply=True)
+
+
+@TxtCommand(aliases=["vol"])
+async def volume(event, dat):
+    """Set the player volume"""
+    try:
+        dat = int(dat)
+    except ValueError:
+        embed = hikari.embeds.Embed(title="Invalid volume", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    if dat < 0:
+        embed = hikari.embeds.Embed(title="Volume too low (0-1000)", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+    elif dat > 1000:
+        embed = hikari.embeds.Embed(title="Volume too high (0-1000)", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+        return
+
+    await lavalink.volume(event.guild_id, dat)
+    embed = hikari.embeds.Embed(title=f"Volume set to {dat}")
+    await event.message.respond(embed=embed, reply=True)
+
+
 @bot.listen()
 async def on_message(event: hikari.MessageCreateEvent) -> None:
     if not event.message or not event.message.content: return
@@ -518,5 +685,23 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         await event.message.respond(embed=embed, reply=True)
 
         raise e
+
+
+@bot.listen()
+async def on_voice_state_update(event: hikari.VoiceStateUpdateEvent):
+    await lavalink.raw_voice_state_update(event.guild_id, event.state.user_id, event.state.session_id, event.state.channel_id)
+
+
+@bot.listen()
+async def on_voice_server_update(event: hikari.VoiceServerUpdateEvent):
+    await lavalink.raw_voice_server_update(event.guild_id, event.endpoint, event.token)
+
+
+@bot.listen()
+async def on_start(event: hikari.StartedEvent):
+    lavalink.set_user_id(bot.get_me().id)
+    lavalink.set_event_loop(asyncio.get_event_loop())
+    lavalink.connect()
+
 
 bot.run()
