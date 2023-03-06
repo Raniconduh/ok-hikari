@@ -464,7 +464,7 @@ async def emoji(event, dat):
         e_id = r.group(1)
         emoji = bot.cache.get_emoji(e_id) or await guild.fetch_emoji(e_id)
     else:
-        emojis = bot.cache.get_emojis_view_for_guild(guild) or await guild.fetch_emojis()
+        emojis = await guild.fetch_emojis()
         for e in emojis:
             if e.name == dat:
                 emoji = e
