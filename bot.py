@@ -12,6 +12,10 @@ from datetime import datetime
 from translatepy import Translator
 from scraper import Scraper as WktScraper
 
+
+BOT_PREFIX = '!'
+
+
 translator = Translator()
 
 bot = hikari.GatewayBot(intents=hikari.Intents.GUILD_MESSAGES
@@ -82,8 +86,18 @@ class Summary:
         self.image = image
 
 
+class Translation:
+    def __init__(self, from_lang, to_lang, res):
+        self.from_lang = from_lang
+        self.to_lang = to_lang
+        self.res = res
+
+
 def query_translator(text, lang="english", origin="auto"):
-    return translator.translate(text, lang, origin).result
+    t = translator.translate(text, lang, origin)
+    return Translation(from_lang=t.source_language.name,
+                       to_lang=t.destination_language.name,
+                       res=t.result)
 
 
 def query_definition(word, lang="en"):
@@ -284,7 +298,8 @@ async def translate(event, dat, to="english", origin="auto"):
                 dat += '\n'.join(l)
 
             if not dat:
-                await event.message.respond("No text", reply=True)
+                embed = hikari.embeds.Embed(title="No text", color=0xFF0000)
+                await event.message.respond(embed=embed, reply=True)
                 return
         else:
             chan = await event.message.fetch_channel()
@@ -295,13 +310,11 @@ async def translate(event, dat, to="english", origin="auto"):
                     dat += '\n'.join(l)
                 break
 
-    dat = re.sub("<@[!#$%^&*]?([0-9]+)>", "@-", dat)
     dat = dat.strip()
 
     loop = asyncio.get_running_loop()
     try:
         t = await loop.run_in_executor(None, query_translator, dat, to, origin)
-        await event.message.respond(t, reply=True)
     except translatepy.exceptions.UnknownLanguage as e:
         embed = hikari.embeds.Embed(title="Unknown language", color=0xFF0000)
         embed.description = f'Maybe you meant {e.guessed_language}?'
@@ -311,6 +324,11 @@ async def translate(event, dat, to="english", origin="auto"):
         await event.message.respond(embed=embed, reply=True)
     except Exception:
         embed = hikari.embeds.Embed(title="Translation failed", color=0xFF0000)
+        await event.message.respond(embed=embed, reply=True)
+    else:
+        embed = hikari.embeds.Embed(title="Translation Result")
+        embed.description = t.res
+        embed.set_footer(f"From {t.from_lang} to {t.to_lang}")
         await event.message.respond(embed=embed, reply=True)
 
 
@@ -628,8 +646,8 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
     # message parsing: return early if the message is clearly not a command
     msg = event.message.content.partition(' ')
     cmd = None
-    if msg[0].startswith('!'):
-        cmd = msg[0][1:]
+    if msg[0].startswith(BOT_PREFIX):
+        cmd = msg[0][len(BOT_PREFIX):]
         msg = msg[2]
     elif msg[0] == f'<@{me.id}>':
         msg = msg[2].partition(' ')
@@ -703,6 +721,8 @@ async def on_start(event: hikari.StartedEvent):
     lavalink.set_user_id(bot.get_me().id)
     lavalink.set_event_loop(asyncio.get_event_loop())
     lavalink.connect()
+
+    print("Started")
 
 
 bot.run()
