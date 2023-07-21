@@ -78,7 +78,8 @@ class Convert:
             "pm": 1e-12,
             "ft": 1/3.2808399,
             "yd": 1/1.0936133,
-            "mi": 1609.344
+            "mi": 1609.344,
+            "in": 0.0254,
         },
         "temperature": {
             "CTYPE": DYNAMIC,
