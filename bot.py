@@ -9,7 +9,6 @@ import urllib.parse
 from functools import wraps
 from datetime import datetime
 from translatepy import Translator
-from scraper import Scraper as WktScraper
 
 
 BOT_PREFIX = '!'
@@ -182,27 +181,20 @@ def query_translator(text, lang="english", origin="auto"):
 
 
 def query_definition(word, lang="en"):
-    resp = None
-    wkt_scraper = WktScraper(lang)
-    try:
-        resp = wkt_scraper.scrape(word)
-    except FileNotFoundError:
-        return None
+    content = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/{lang}/{word}")
+    json = content.json()
+    # No definitions found
+    if type(json) is dict or not len(json): return None
+    resp = json[0]
 
-    phonetic = ""
-    p = resp.get("pronunciation", None)
-    if p and len(p) > 0:
-        phonetic = p[0]['values'][0]
+    phonetic = resp.get('phonetic')
 
     ret = {"phonetic": phonetic, "definitions": []}
 
     for meaning in resp["meanings"]:
-        pos = meaning.get("part_of_speech", "")
-        for val in meaning["values"]:
-            # try to ignore entries that start with a year or range of years
-            txt = val["text"].split('\n')[0].strip()
-            if re.match(r"^([Cc]\.\s)?[0-9]{4}([-\u2010-\u2015][0-9]{4})?,?\s", txt): continue
-
+        pos = meaning.get("partOfSpeech", "")
+        for definition in meaning["definitions"]:
+            txt = definition["definition"]
             info = ""
             if r := re.match(r'^\([^)]+\) ', txt):
                 info = r.group().strip()
@@ -210,6 +202,8 @@ def query_definition(word, lang="en"):
             if not txt: continue
             ret["definitions"].append(Definition(pos, txt, info))
 
+    # can't have more than 25 fields, call it a day at 20
+    ret["definitions"] = ret["definitions"][:20]
     return ret
 
 
