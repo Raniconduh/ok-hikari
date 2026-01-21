@@ -441,7 +441,7 @@ async def avatar(event, dat):
         return
 
     e = hikari.embeds.Embed(title=f"Avatar for {user.username}#{user.discriminator}")
-    e.set_image(user.avatar_url or user.default_avatar_url)
+    e.set_image(user.display_avatar_url or user.default_avatar_url)
     await event.message.respond(embed=e, reply=True)
 
 
