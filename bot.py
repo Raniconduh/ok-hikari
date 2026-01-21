@@ -349,9 +349,27 @@ async def c_help(event, dat):
         await event.message.respond(embed=embed, reply=True)
 
 
-@TxtCommand(aliases=["t"], flags=[Flag("to", "lang"), Flag("origin", "lang")], arguments="[text]")
-async def translate(event, dat, to="english", origin="auto"):
+@TxtCommand(
+    aliases=["t"],
+    flags=[
+        Flag("to", "lang"),
+        Flag("origin", "lang"),
+        Flag("from", "lang")
+    ],
+    arguments="[text]"
+)
+async def translate(event, dat, to="english", origin="auto", **kwargs):
     """Translate text, replied message, or latest message"""
+
+    if "from" in kwargs:
+        if origin != "auto":
+            embed = hikari.embeds.Embed(
+                title="Too many origin languages",
+                color=0xFF0000
+            )
+            await event.message.respond(embed=embed, reply=True)
+            return
+        origin = kwargs["from"]
 
     if not dat:
         dat = ""
