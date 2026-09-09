@@ -346,6 +346,7 @@ async def c_help(event, dat):
 
             embed.add_field(txt, com.desc)
 
+        embed.add_field("", "-# https://github.com/Raniconduh/ok-hikari")
         await event.message.respond(embed=embed, reply=True)
 
 
