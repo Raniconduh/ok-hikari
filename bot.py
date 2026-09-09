@@ -354,11 +354,12 @@ async def c_help(event, dat):
     flags=[
         Flag("to", "lang"),
         Flag("origin", "lang"),
-        Flag("from", "lang")
+        Flag("from", "lang"),
+        Flag("simple"),
     ],
     arguments="[text]"
 )
-async def translate(event, dat, to="english", origin="auto", **kwargs):
+async def translate(event, dat, to="english", origin="auto", simple=False, **kwargs):
     """Translate text, replied message, or latest message"""
 
     if "from" in kwargs:
@@ -409,10 +410,13 @@ async def translate(event, dat, to="english", origin="auto", **kwargs):
         embed = hikari.embeds.Embed(title="Translation failed", color=0xFF0000)
         await event.message.respond(embed=embed, reply=True)
     else:
-        embed = hikari.embeds.Embed(title="Translation Result")
-        embed.description = t.res
-        embed.set_footer(f"From {t.from_lang} to {t.to_lang}")
-        await event.message.respond(embed=embed, reply=True)
+        if simple:
+            await event.message.respond(t.res, reply=True)
+        else:
+            embed = hikari.embeds.Embed(title="Translation Result")
+            embed.description = t.res
+            embed.set_footer(f"From {t.from_lang} to {t.to_lang}")
+            await event.message.respond(embed=embed, reply=True)
 
 
 @TxtCommand(aliases=["a"], arguments="[user]")
@@ -668,6 +672,9 @@ async def on_message(event: hikari.MessageCreateEvent) -> None:
         found = False
         for f in cmd.flags:
             if flag == f.flag:
+                if f.arg is None:
+                    # flag expects no arguments
+                    val = True
                 flags[flag] = val
                 found = True
                 break
